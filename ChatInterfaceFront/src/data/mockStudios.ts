@@ -1,0 +1,88 @@
+import { Studio } from '../types/Studio';
+
+export const mockStudios: Studio[] = [
+  {
+    id: '1',
+    name: 'Pixel Perfect Studios',
+    addedBy: 'Alex Durand',
+    rating: 5.0,
+    initials: 'PP',
+    status: 'approved',
+    services: [
+      { name: 'Compositing', color: 'green' },
+      { name: 'Animation', color: 'blue' },
+      { name: '3D Modeling', color: 'yellow' },
+      { name: 'Rotoscoping', color: 'mint' },
+    ],
+  },
+  {
+    id: '2',
+    name: 'Digital Vision FX',
+    addedBy: 'Sarah Chen',
+    rating: 4.8,
+    initials: 'DV',
+    status: 'pending',
+    services: [
+      { name: 'Character Animation', color: 'green' },
+      { name: 'VFX Supervision', color: 'purple' },
+      { name: 'Rigging', color: 'yellow' },
+      { name: 'Lighting', color: 'orange' },
+    ],
+  },
+  {
+    id: '3',
+    name: 'Quantum Effects',
+    addedBy: 'Michael Rodriguez',
+    rating: 4.9,
+    initials: 'QE',
+    status: 'approved',
+    services: [
+      { name: 'Fluid Simulation', color: 'blue' },
+      { name: 'Particle Effects', color: 'purple' },
+      { name: 'Destruction', color: 'orange' },
+      { name: 'Crowd Simulation', color: 'green' },
+    ],
+  },
+  {
+    id: '4',
+    name: 'Chromatic Studios',
+    addedBy: 'Emma Thompson',
+    rating: 4.7,
+    initials: 'CS',
+    status: 'approved',
+    services: [
+      { name: 'Color Grading', color: 'mint' },
+      { name: 'Matte Painting', color: 'green' },
+      { name: 'Environment Design', color: 'blue' },
+      { name: 'Concept Art', color: 'yellow' },
+    ],
+  },
+  {
+    id: '5',
+    name: 'Motion Craft',
+    addedBy: 'David Park',
+    rating: 4.6,
+    initials: 'MC',
+    status: 'pending',
+    services: [
+      { name: 'Motion Graphics', color: 'purple' },
+      { name: '2D Animation', color: 'orange' },
+      { name: 'Typography', color: 'blue' },
+      { name: 'UI Animation', color: 'green' },
+    ],
+  },
+  {
+    id: '6',
+    name: 'Render Farm Studios',
+    addedBy: 'Lisa Johnson',
+    rating: 4.9,
+    initials: 'RF',
+    status: 'approved',
+    services: [
+      { name: 'Rendering Services', color: 'yellow' },
+      { name: 'Cloud Computing', color: 'blue' },
+      { name: 'Pipeline Solutions', color: 'mint' },
+      { name: 'Technical Support', color: 'green' },
+    ],
+  },
+];
