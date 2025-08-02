@@ -6,11 +6,11 @@ import {
   Paperclip, 
   Mic, 
   Send,
- 
   X,
+  Download,
+  Upload
 } from 'lucide-react';
-import { io, Socket } from 'socket.io-client';
-import VoiceMessage from './VoiceMessage';
+
 interface User {
   id: string;
   name: string;
@@ -23,17 +23,21 @@ interface Message {
   senderId: string;
   content: string;
   timestamp: Date;
-  type: 'text' | 'voice';
+  type: 'text' | 'voice' | 'file';
   fileName?: string;
   fileSize?: string;
   audioUrl?: string;
+  fileUrl?: string;
+  fileType?: string;
   chatId: string;
+  senderName?: string;
 }
 
+const randomName = 'User_' + Math.floor(Math.random() * 10000);
 const currentUser: User = {
-  id: 'user1',
-  name: 'Dhia',
-  initials: 'D',
+  id: crypto.randomUUID(),
+  name: randomName,
+  initials: randomName.charAt(5),
 };
 
 const VoiceRecorder = ({
@@ -53,19 +57,16 @@ const VoiceRecorder = ({
 
   React.useEffect(() => {
     if (isRecording) {
-      // Timer
       intervalRef.current = setInterval(() => {
         setRecordingTime(prev => prev + 1);
       }, 1000);
 
-      // Waveform animation
       const animateWaveform = () => {
         setWaveformBars(prev => prev.map(() => Math.random() * 100));
         animationRef.current = setTimeout(animateWaveform, 250);
       };
       animateWaveform();
 
-      // Start recording
       navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
         const mediaRecorder = new MediaRecorder(stream);
         mediaRecorderRef.current = mediaRecorder;
@@ -82,7 +83,6 @@ const VoiceRecorder = ({
       });
 
     } else {
-      // Stop recording
       if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
         mediaRecorderRef.current.stop();
       }
@@ -190,95 +190,260 @@ const VoiceRecorder = ({
   );
 };
 
+// VoiceMessage component (placeholder since original wasn't provided)
+const VoiceMessage = ({ fileName, duration, audioUrl }: { fileName: string; duration: string; audioUrl: string }) => {
+  return (
+    <div className="flex items-center space-x-3 py-2">
+      <div className="w-8 h-8 bg-[#1A1C24] rounded-full flex items-center justify-center">
+        <Mic className="w-4 h-4 text-[#2D99A7]" />
+      </div>
+      <div className="flex-1">
+        <p className="text-sm font-medium">{fileName}</p>
+        <p className="text-xs text-[#B0B3B8]">{duration}</p>
+      </div>
+      <audio controls className="max-w-[200px]">
+        <source src={audioUrl} type="audio/webm" />
+      </audio>
+    </div>
+  );
+};
+
+const FileUpload = ({ onFileSelect }: { onFileSelect: (file: File) => void }) => {
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Check file type
+      const allowedTypes = [
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
+        'application/vnd.ms-excel', // .xls
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx
+        'application/msword', // .doc
+        'application/pdf' // .pdf
+      ];
+      
+      const allowedExtensions = ['.xlsx', '.xls', '.docx', '.doc', '.pdf'];
+      const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
+      
+      if (allowedTypes.includes(file.type) || allowedExtensions.includes(fileExtension)) {
+        onFileSelect(file);
+      } else {
+        alert('Please select only Excel (.xlsx, .xls), Word (.docx, .doc), or PDF files.');
+      }
+    }
+    // Reset the input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  return (
+    <>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".xlsx,.xls,.docx,.doc,.pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword,application/pdf"
+        onChange={handleFileSelect}
+        className="hidden"
+      />
+      <button
+        onClick={() => fileInputRef.current?.click()}
+        className="text-[#B0B3B8] hover:text-white transition-colors p-2 rounded-full hover:bg-[#2C2E3A]"
+        title="Upload file (Excel, Word, PDF)"
+      >
+        <Paperclip className="w-5 h-5" />
+      </button>
+    </>
+  );
+};
+
+const FileMessage = ({ fileName, fileSize, fileType, fileUrl }: { 
+  fileName: string; 
+  fileSize: string; 
+  fileType: string;
+  fileUrl?: string;
+}) => {
+  const getFileIcon = (type: string) => {
+    if (type.includes('excel') || type.includes('spreadsheet')) {
+      return '📊';
+    } else if (type.includes('word') || type.includes('document')) {
+      return '📄';
+    } else if (type.includes('pdf')) {
+      return '📋';
+    }
+    return '📎';
+  };
+
+  const handleDownload = () => {
+    if (fileUrl) {
+      const link = document.createElement('a');
+      link.href = fileUrl;
+      link.download = fileName;
+      link.click();
+    }
+  };
+
+  return (
+    <div className="flex items-center space-x-3 p-3 bg-[#1A1C24] rounded-lg border border-[#2C2E3A] max-w-[300px]">
+      <div className="w-10 h-10 bg-[#2C2E3A] rounded-lg flex items-center justify-center">
+        <span className="text-xl">{getFileIcon(fileType)}</span>
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-white truncate">{fileName}</p>
+        <p className="text-xs text-[#B0B3B8]">{fileSize}</p>
+      </div>
+      {fileUrl && (
+        <button
+          onClick={handleDownload}
+          className="text-[#2D99A7] hover:text-[#2D99A7]/80 transition-colors p-1 rounded"
+          title="Download file"
+        >
+          <Download className="w-4 h-4" />
+        </button>
+      )}
+    </div>
+  );
+};
+
 const ChatPanel = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [textInput, setTextInput] = useState('');
   const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
-const [socket] = useState<Socket>(() => io('http://localhost:3001'));
-const chatId = 'default-chat';
-React.useEffect(() => {
-  socket.emit('join-chat', chatId);
+  const [isUploading, setIsUploading] = useState(false);
 
-  const handleReceiveMessage = (messageData: Message) => {
-    setMessages((prev) => [...prev, {
-      ...messageData,
-      timestamp: new Date(messageData.timestamp)
-    }]);
+  // Mock socket for demo purposes
+  const socket = {
+    emit: (event: string, data: Message) => {
+      console.log('Socket emit:', event, data);
+    },
+    on: () => {},
+    off: () => {}
   };
 
-  const handleMessageSent = (messageData: Message) => {
-    console.log('Message sent successfully:', messageData);
+  const chatId = 'default-chat';
+
+  const formatFileSize = (bytes: number): string => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
-  socket.on('receive-message', handleReceiveMessage);
-  socket.on('message-sent', handleMessageSent);
+  const handleSendTextMessage = () => {
+    if (!textInput.trim()) return;
 
-  return () => {
-    socket.off('receive-message', handleReceiveMessage);
-    socket.off('message-sent', handleMessageSent);
-  };
-}, [socket]);
-const handleSendTextMessage = () => {
-  if (!textInput.trim()) return;
+    const message: Message = {
+      id: crypto.randomUUID(),
+      senderId: currentUser.id,
+      content: textInput.trim(),
+      timestamp: new Date(),
+      type: 'text',
+      chatId,
+      senderName: currentUser.name,
+    };
 
-  const message: Message = {
-    id: crypto.randomUUID(),
-    senderId: currentUser.id,
-    content: textInput.trim(),
-    timestamp: new Date(),
-    type: 'text',
-    chatId,
+    setMessages((prev) => [...prev, message]);
+    socket.emit('send-message', message);
+    setTextInput('');
   };
 
-  setMessages((prev) => [...prev, message]);
-  socket.emit('send-message', message);
-  setTextInput('');
-};
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSendTextMessage();
     }
   };
-const handleSendVoiceMessage = async (audioBlob: Blob, duration: number) => {
-  const minutes = Math.floor(duration / 60);
-  const seconds = (duration % 60).toString().padStart(2, '0');
-  
-  try {
-    const formData = new FormData();
-    formData.append('audio', audioBlob);
-    
-    const uploadResponse = await fetch('http://localhost:3001/chat/upload-audio', {
-      method: 'POST',
-      body: formData,
-    });
-    
-    if (!uploadResponse.ok) {
-      throw new Error('Failed to upload audio');
-    }
-    
-    const { audioUrl } = await uploadResponse.json();
-    
-    const message: Message = {
-      id: crypto.randomUUID(),
-      senderId: currentUser.id,
-      content: `Voice message (${minutes}:${seconds})`,
-      timestamp: new Date(),
-      type: 'voice',
-      fileName: `audio-${Date.now()}.webm`,
-      fileSize: `${duration}s`,
-      audioUrl,
-      chatId,
-    };
 
-    setMessages((prev) => [...prev, message]);
-    socket.emit('send-message', message);
-    setShowVoiceRecorder(false);
-  } catch (error) {
-    console.error('Error uploading voice message:', error);
-    alert('Failed to send voice message');
-  }
-};
+  const handleFileUpload = async (file: File) => {
+    setIsUploading(true);
+    
+    try {
+      // Create FormData for file upload
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('chatId', chatId);
+      formData.append('senderId', currentUser.id);
+
+      // Upload file to server
+      const uploadResponse = await fetch('http://localhost:3001/chat/upload-file', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!uploadResponse.ok) {
+        throw new Error('Failed to upload file');
+      }
+
+      const { fileUrl, fileName, fileSize, fileType } = await uploadResponse.json();
+
+      // Create file message
+      const message: Message = {
+        id: crypto.randomUUID(),
+        senderId: currentUser.id,
+        content: `Shared a file: ${fileName}`,
+        timestamp: new Date(),
+        type: 'file',
+        fileName: fileName || file.name,
+        fileSize: fileSize || formatFileSize(file.size),
+        fileType: fileType || file.type,
+        fileUrl,
+        chatId,
+        senderName: currentUser.name,
+      };
+
+      setMessages((prev) => [...prev, message]);
+      socket.emit('send-message', message);
+      
+    } catch (error) {
+      console.error('Error uploading file:', error);
+      alert('Failed to upload file. Please try again.');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleSendVoiceMessage = async (audioBlob: Blob, duration: number) => {
+    const minutes = Math.floor(duration / 60);
+    const seconds = (duration % 60).toString().padStart(2, '0');
+    
+    try {
+      const formData = new FormData();
+      formData.append('audio', audioBlob);
+      
+      const uploadResponse = await fetch('http://localhost:3001/chat/upload-audio', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      if (!uploadResponse.ok) {
+        throw new Error('Failed to upload audio');
+      }
+      
+      const { audioUrl } = await uploadResponse.json();
+      
+      const message: Message = {
+        id: crypto.randomUUID(),
+        senderId: currentUser.id,
+        content: `Voice message (${minutes}:${seconds})`,
+        timestamp: new Date(),
+        type: 'voice',
+        fileName: `audio-${Date.now()}.webm`,
+        fileSize: `${duration}s`,
+        audioUrl,
+        chatId,
+        senderName: currentUser.name,
+      };
+
+      setMessages((prev) => [...prev, message]);
+      socket.emit('send-message', message);
+      setShowVoiceRecorder(false);
+    } catch (error) {
+      console.error('Error uploading voice message:', error);
+      alert('Failed to send voice message');
+    }
+  };
 
   const handleCancelVoiceRecording = () => {
     setShowVoiceRecorder(false);
@@ -298,10 +463,10 @@ const handleSendVoiceMessage = async (audioBlob: Blob, duration: number) => {
     return (
       <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'} mb-4`}>
         <div className={`max-w-[70%] ${isMe ? 'order-2' : 'order-1'}`}>
-          {!isMe && (
-            <p className="text-[#B0B3B8] text-xs mb-1 ml-1">{currentUser.name}</p>
-          )}
-          
+         {!isMe && (
+          <p className="text-[#B0B3B8] text-xs mb-1 ml-1">{msg.senderName || 'Anonymous'}</p>
+         )}
+
           <div className={`rounded-lg px-4 py-2 ${
             isMe 
               ? 'bg-[#2D99A7] text-white' 
@@ -311,14 +476,22 @@ const handleSendVoiceMessage = async (audioBlob: Blob, duration: number) => {
               <p className="text-sm">{msg.content}</p>
             )}
             
-           {msg.type === 'voice' && msg.audioUrl && (
+            {msg.type === 'voice' && msg.audioUrl && (
+              <VoiceMessage
+                fileName={msg.fileName || 'Voice message'}
+                duration={msg.fileSize || ''}
+                audioUrl={msg.audioUrl}
+              />
+            )}
 
-  <VoiceMessage
-    fileName={msg.fileName || 'Voice message'}
-    duration={msg.fileSize || ''}
-    audioUrl={msg.audioUrl}
-  />
-)}
+            {msg.type === 'file' && (
+              <FileMessage
+                fileName={msg.fileName || 'Unknown file'}
+                fileSize={msg.fileSize || ''}
+                fileType={msg.fileType || ''}
+                fileUrl={msg.fileUrl}
+              />
+            )}
           </div>
           
           <p className={`text-[#B0B3B8] text-xs mt-1 ${isMe ? 'text-right mr-1' : 'ml-1'}`}>
@@ -378,7 +551,7 @@ const handleSendVoiceMessage = async (audioBlob: Blob, duration: number) => {
                 <span className="text-[#B0B3B8] text-2xl">💬</span>
               </div>
               <h3 className="text-white text-lg font-semibold mb-2">No messages yet</h3>
-              <p className="text-[#B0B3B8]">Start a conversation by typing a message</p>
+              <p className="text-[#B0B3B8]">Start a conversation by typing a message or uploading a file</p>
             </div>
           </div>
         ) : (
@@ -386,12 +559,20 @@ const handleSendVoiceMessage = async (audioBlob: Blob, duration: number) => {
         )}
       </div>
 
+      {/* Upload Progress Indicator */}
+      {isUploading && (
+        <div className="bg-[#1A1C24] px-4 py-2 border-t border-[#2C2E3A]">
+          <div className="flex items-center space-x-3">
+            <Upload className="w-4 h-4 text-[#2D99A7] animate-pulse" />
+            <span className="text-[#B0B3B8] text-sm">Uploading file...</span>
+          </div>
+        </div>
+      )}
+
       {/* Input Bar */}
       <div className="bg-[#1A1C24] p-4 border-t border-[#2C2E3A]">
         <div className="flex items-center space-x-3">
-          <button className="text-[#B0B3B8] hover:text-white transition-colors" title="Attach file">
-            <Paperclip className="w-5 h-5" />
-          </button>
+          <FileUpload onFileSelect={handleFileUpload} />
           
           <div className="flex-1 relative">
             <input
@@ -401,7 +582,7 @@ const handleSendVoiceMessage = async (audioBlob: Blob, duration: number) => {
               onKeyPress={handleKeyPress}
               placeholder="Type your message..."
               className="w-full bg-[#2C2E3A] text-white px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2D99A7] pr-12"
-              disabled={showVoiceRecorder}
+              disabled={showVoiceRecorder || isUploading}
             />
           </div>
           
@@ -413,8 +594,9 @@ const handleSendVoiceMessage = async (audioBlob: Blob, duration: number) => {
           ) : (
             <button 
               onClick={() => setShowVoiceRecorder(true)}
-              className="text-[#B0B3B8] hover:text-white transition-colors"
+              className="text-[#B0B3B8] hover:text-white transition-colors p-2 rounded-full hover:bg-[#2C2E3A]"
               title="Record voice message"
+              disabled={isUploading}
             >
               <Mic className="w-5 h-5" />
             </button>
@@ -423,11 +605,11 @@ const handleSendVoiceMessage = async (audioBlob: Blob, duration: number) => {
           <button 
             onClick={handleSendTextMessage}
             className={`p-2 rounded-lg transition-colors ${
-              showVoiceRecorder 
+              showVoiceRecorder || isUploading
                 ? 'bg-gray-600 text-gray-400 cursor-not-allowed' 
                 : 'bg-[#2D99A7] text-white hover:bg-[#2D99A7]/80'
             }`}
-            disabled={showVoiceRecorder}
+            disabled={showVoiceRecorder || isUploading}
             title="Send message"
           >
             <Send className="w-5 h-5" />

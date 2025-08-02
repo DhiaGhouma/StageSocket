@@ -10,7 +10,14 @@ async function bootstrap() {
   // Enable WebSockets (Socket.IO)
   app.useWebSocketAdapter(new IoAdapter(app));
 
-  // Serve static files from /uploads
+  // Serve static files with the correct URL structure
+  // This serves files from uploads/audio at /audio/ endpoint
+  app.use('/audio', express.static(join(__dirname, '..', 'uploads', 'audio')));
+  
+  // This serves files from uploads/files at /files/ endpoint
+  app.use('/files', express.static(join(__dirname, '..', 'uploads', 'files')));
+
+  // Optional: Keep the general uploads endpoint for backward compatibility
   app.use('/uploads', express.static(join(__dirname, '..', 'uploads')));
 
   // Allow CORS for frontend (adjust port if needed)
