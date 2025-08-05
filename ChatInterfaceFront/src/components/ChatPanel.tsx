@@ -7,7 +7,6 @@ import {
   Mic, 
   Send,
   X,
-  FileText,
   Download,
   Upload
 } from 'lucide-react';
