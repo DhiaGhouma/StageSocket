@@ -7,9 +7,12 @@ import {
   Mic, 
   Send,
   X,
+  FileText,
   Download,
   Upload
 } from 'lucide-react';
+import { io, Socket } from 'socket.io-client';
+import VoiceMessage from './VoiceMessage';
 
 interface User {
   id: string;
@@ -37,7 +40,7 @@ const randomName = 'User_' + Math.floor(Math.random() * 10000);
 const currentUser: User = {
   id: crypto.randomUUID(),
   name: randomName,
-  initials: randomName.charAt(5),
+  initials: randomName.charAt(5), // Grab number from 'User_1234'
 };
 
 const VoiceRecorder = ({
@@ -57,16 +60,19 @@ const VoiceRecorder = ({
 
   React.useEffect(() => {
     if (isRecording) {
+      // Timer
       intervalRef.current = setInterval(() => {
         setRecordingTime(prev => prev + 1);
       }, 1000);
 
+      // Waveform animation
       const animateWaveform = () => {
         setWaveformBars(prev => prev.map(() => Math.random() * 100));
         animationRef.current = setTimeout(animateWaveform, 250);
       };
       animateWaveform();
 
+      // Start recording
       navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
         const mediaRecorder = new MediaRecorder(stream);
         mediaRecorderRef.current = mediaRecorder;
@@ -83,6 +89,7 @@ const VoiceRecorder = ({
       });
 
     } else {
+      // Stop recording
       if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
         mediaRecorderRef.current.stop();
       }
@@ -190,24 +197,6 @@ const VoiceRecorder = ({
   );
 };
 
-// VoiceMessage component (placeholder since original wasn't provided)
-const VoiceMessage = ({ fileName, duration, audioUrl }: { fileName: string; duration: string; audioUrl: string }) => {
-  return (
-    <div className="flex items-center space-x-3 py-2">
-      <div className="w-8 h-8 bg-[#1A1C24] rounded-full flex items-center justify-center">
-        <Mic className="w-4 h-4 text-[#2D99A7]" />
-      </div>
-      <div className="flex-1">
-        <p className="text-sm font-medium">{fileName}</p>
-        <p className="text-xs text-[#B0B3B8]">{duration}</p>
-      </div>
-      <audio controls className="max-w-[200px]">
-        <source src={audioUrl} type="audio/webm" />
-      </audio>
-    </div>
-  );
-};
-
 const FileUpload = ({ onFileSelect }: { onFileSelect: (file: File) => void }) => {
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
@@ -249,7 +238,7 @@ const FileUpload = ({ onFileSelect }: { onFileSelect: (file: File) => void }) =>
       />
       <button
         onClick={() => fileInputRef.current?.click()}
-        className="text-[#B0B3B8] hover:text-white transition-colors p-2 rounded-full hover:bg-[#2C2E3A]"
+        className="text-[#B0B3B8] hover:text-white transition-colors"
         title="Upload file (Excel, Word, PDF)"
       >
         <Paperclip className="w-5 h-5" />
@@ -312,16 +301,37 @@ const ChatPanel = () => {
   const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
 
-  // Mock socket for demo purposes
-  const socket = {
-    emit: (event: string, data: Message) => {
-      console.log('Socket emit:', event, data);
-    },
-    on: () => {},
-    off: () => {}
-  };
+  const [socket] = useState<Socket>(() => io('http://localhost:3001', {
+    query: {
+      username: randomName,
+      userId: currentUser.id
+    }
+  }));
 
   const chatId = 'default-chat';
+
+  React.useEffect(() => {
+    socket.emit('join-chat', chatId);
+
+    const handleReceiveMessage = (messageData: Message) => {
+      setMessages((prev) => [...prev, {
+        ...messageData,
+        timestamp: new Date(messageData.timestamp)
+      }]);
+    };
+
+    const handleMessageSent = (messageData: Message) => {
+      console.log('Message sent successfully:', messageData);
+    };
+
+    socket.on('receive-message', handleReceiveMessage);
+    socket.on('message-sent', handleMessageSent);
+
+    return () => {
+      socket.off('receive-message', handleReceiveMessage);
+      socket.off('message-sent', handleMessageSent);
+    };
+  }, [socket]);
 
   const formatFileSize = (bytes: number): string => {
     if (bytes === 0) return '0 Bytes';
@@ -360,11 +370,15 @@ const ChatPanel = () => {
     setIsUploading(true);
     
     try {
+      console.log('Uploading file:', file.name, file.type, file.size);
+      
       // Create FormData for file upload
       const formData = new FormData();
       formData.append('file', file);
       formData.append('chatId', chatId);
       formData.append('senderId', currentUser.id);
+
+      console.log('Sending request to: http://localhost:3001/chat/upload-file');
 
       // Upload file to server
       const uploadResponse = await fetch('http://localhost:3001/chat/upload-file', {
@@ -594,7 +608,7 @@ const ChatPanel = () => {
           ) : (
             <button 
               onClick={() => setShowVoiceRecorder(true)}
-              className="text-[#B0B3B8] hover:text-white transition-colors p-2 rounded-full hover:bg-[#2C2E3A]"
+              className="text-[#B0B3B8] hover:text-white transition-colors"
               title="Record voice message"
               disabled={isUploading}
             >
