@@ -10,9 +10,14 @@ async function bootstrap() {
   // Enable WebSockets (Socket.IO)
   app.useWebSocketAdapter(new IoAdapter(app));
 
-  // Serve static files with the correct URL structure
-  // This serves files from uploads/audio at /audio/ endpoint
-  app.use('/audio', express.static(join(__dirname, '..', 'uploads', 'audio')));
+  app.use(
+  '/audio',
+  express.static(join(__dirname, '..', 'uploads', 'audio'), {
+    setHeaders: (res) => {
+      res.setHeader('Access-Control-Allow-Origin', '*');
+    },
+  }),
+);
   
   // This serves files from uploads/files at /files/ endpoint
   app.use('/files', express.static(join(__dirname, '..', 'uploads', 'files')));
